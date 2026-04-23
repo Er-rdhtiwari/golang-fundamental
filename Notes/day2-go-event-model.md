@@ -1,8 +1,9 @@
 # Day 2 — Golang Structs, Methods, Packages, and Event Model
 
-Today we move from “how input enters the CLI” to “how the program stores that input in a proper model.”
+Today we move from “basic CLI flow” to “clean project structure.”
 
-This is a very important day because real backend and DevOps tools do not pass random loose values everywhere. They usually convert input into a **typed object** first, validate it, and then pass that object through the system.
+On Day 1, input came into the program through flags.
+On Day 2, we learn how to **convert that raw input into a proper typed model** like `PipelineEvent`, validate it, and pass it cleanly through the project.
 
 ---
 
@@ -10,160 +11,56 @@ This is a very important day because real backend and DevOps tools do not pass r
 
 By the end of Day 2, you should understand:
 
-* what a `struct` is in Go
-* how methods work on structs
-* what packages are
-* exported vs unexported names
-* how code is organized into folders in real projects
-* what an event model is
-* how raw CLI input becomes a typed `PipelineEvent`
-* why validation should live in the model layer
-* why passing one struct is better than passing many loose values
-* basic string concepts for DSA
-* one easy Go string problem
+1. What a **struct** is in Go
+2. How **methods** work on structs
+3. How **packages** help organize real backend/CLI code
+4. What **exported vs unexported** names mean
+5. How a project uses a model like `PipelineEvent`
+6. How raw CLI input becomes a **typed event object**
+7. Why validation should live in the **model layer**
+8. Why a struct is better than passing many loose variables
+9. How this pattern relates to real production backend projects
+10. How Go ideas compare with Python classes, methods, and modules
 
 ---
 
 ## 2. Quick revision of Day 1 in 5–8 points
 
-Here is the Day 1 recap in simple language:
+Here is the Day 1 revision in simple form:
 
-1. A Go program starts from `package main` and `func main()`.
-2. `main.go` is usually the entry point of a CLI program.
-3. CLI flags let the user pass input like `--event pr --status success`.
-4. `go.mod` defines the module name and manages dependencies.
-5. Imports are how one Go file uses another package.
-6. A CLI tool reads input, processes it, and performs an action.
-7. In a production CLI, the flow is usually: input -> parse -> validate -> build request -> execute.
-8. Real tools should separate responsibilities instead of putting everything inside `main.go`.
+1. A Go program starts from `package main` and `func main()`
+2. `go.mod` defines the module name and dependencies
+3. CLI flags are used to accept input from the terminal
+4. Raw input first enters the program as strings, bools, ints, etc.
+5. `main.go` usually acts as the **entry point**, not the full business logic
+6. A real CLI should separate input parsing from validation and processing
+7. Go is strongly typed, so we prefer clear structured data over random loose values
+8. Production-style CLI tools are easier to maintain when logic is split into packages
 
 ---
 
 ## 3. Beginner-friendly explanation of structs using simple examples first
 
-### What is a struct?
+## What is a struct?
 
-A `struct` is a way to group related data together.
+A **struct** is a way to group related data together into one typed object.
 
-Think like this:
+In Python, this feels like:
 
-If you want to represent one person, you do not want 5 separate variables floating around.
+* a class with attributes
+* or sometimes a dictionary, but more structured and safer
 
-Bad style:
+### Python example
 
-```go
-name := "Radhe"
-age := 28
-city := "Chennai"
-email := "radhe@example.com"
-isActive := true
+```python
+class User:
+    def __init__(self, name, age, active):
+        self.name = name
+        self.age = age
+        self.active = active
 ```
 
-These values are related, but they are scattered.
-
-Better style:
-
-```go
-type Person struct {
-	Name     string
-	Age      int
-	City     string
-	Email    string
-	IsActive bool
-}
-```
-
-Now one `Person` value can hold all related fields together.
-
-Example:
-
-```go
-p := Person{
-	Name:     "Radhe",
-	Age:      28,
-	City:     "Chennai",
-	Email:    "radhe@example.com",
-	IsActive: true,
-}
-```
-
-### Real-life meaning
-
-A struct is like a form.
-
-For example:
-
-* Student form
-* Employee record
-* Order details
-* API request object
-* Pipeline event
-
-All of these are “one thing” with multiple related fields.
-
----
-
-### Toy example 1: Book
-
-```go
-type Book struct {
-	Title  string
-	Author string
-	Price  float64
-}
-```
-
-Use it:
-
-```go
-book := Book{
-	Title:  "Go Basics",
-	Author: "John",
-	Price:  499.0,
-}
-```
-
----
-
-### Toy example 2: Car
-
-```go
-type Car struct {
-	Brand string
-	Model string
-	Year  int
-}
-```
-
----
-
-### Why structs matter in backend projects
-
-In backend projects, we often need to represent:
-
-* user requests
-* database rows
-* configuration
-* events
-* API responses
-* pipeline metadata
-
-In your project, the important struct is something like:
-
-* `PipelineEvent`
-* `NotificationRequest`
-
-That struct becomes the clean typed form of raw input.
-
----
-
-### Zero values in structs
-
-This is very important in Go.
-
-If you create a struct and do not assign values, Go gives default values automatically.
-
-Example:
+### Go equivalent
 
 ```go
 type User struct {
@@ -173,312 +70,540 @@ type User struct {
 }
 ```
 
-```go
-var u User
-fmt.Println(u)
-```
+This means:
 
-Output idea:
-
-```go
-{Name: Age:0 Active:false}
-```
-
-So default zero values are:
-
-* `string` -> `""`
-* `int` -> `0`
-* `bool` -> `false`
-* pointer -> `nil`
-* slice -> `nil`
-* map -> `nil`
-
-### Why zero values matter in validation
-
-Suppose user forgets to send `event type`.
-
-Then this may happen:
-
-```go
-event.EventType == ""
-```
-
-That empty string is the zero value.
-
-So validation checks often look for zero values.
+* `User` is a new type
+* it contains 3 fields
+* every field has a fixed type
 
 ---
 
-## 4. Beginner-friendly explanation of methods
+## Why structs matter
 
-### What is a method?
-
-A method is a function attached to a type.
-
-Normal function:
+Without structs, you might pass values like this:
 
 ```go
-func Add(a int, b int) int {
-	return a + b
-}
+name := "Radhe"
+age := 30
+active := true
 ```
 
-Method on struct:
+That works for tiny examples.
 
-```go
-type Person struct {
-	Name string
-	Age  int
-}
+But in a real project, imagine passing:
 
-func (p Person) Introduce() string {
-	return "Hi, my name is " + p.Name
-}
-```
+* event type
+* status
+* repo URL
+* branch name
+* author
+* commit SHA
+* environment
+* timestamp
 
-Use it:
+Passing all of them separately becomes messy very quickly.
 
-```go
-p := Person{Name: "Radhe", Age: 28}
-fmt.Println(p.Introduce())
-```
+That is why we use a struct.
 
 ---
 
-### Why use methods?
-
-Because behavior should stay close to the data it belongs to.
-
-Example:
-
-If `PipelineEvent` needs validation, then this is clean:
-
-```go
-func (e PipelineEvent) Validate() error
-```
-
-instead of some random helper like:
-
-```go
-func ValidateEvent(eventType, status, repoURL, branch, author string) error
-```
-
-The method form is easier to read and maintain.
-
----
-
-### Toy example: Rectangle with method
+## Toy example: Student
 
 ```go
 package main
 
 import "fmt"
 
-type Rectangle struct {
-	Width  float64
-	Height float64
-}
-
-func (r Rectangle) Area() float64 {
-	return r.Width * r.Height
+type Student struct {
+	Name   string
+	Course string
+	Age    int
 }
 
 func main() {
-	rect := Rectangle{Width: 10, Height: 5}
-	fmt.Println("Area:", rect.Area())
+	s := Student{
+		Name:   "Radhe",
+		Course: "Go Basics",
+		Age:    28,
+	}
+
+	fmt.Println(s.Name)
+	fmt.Println(s.Course)
+	fmt.Println(s.Age)
 }
+```
+
+### Output
+
+```go
+Radhe
+Go Basics
+28
 ```
 
 ---
 
-### Method receiver
+## Zero values in structs
+
+This is very important in Go.
+
+If you create a struct and do not set fields, Go gives **zero values** automatically.
+
+```go
+type Student struct {
+	Name   string
+	Age    int
+	Active bool
+}
+```
+
+If you write:
+
+```go
+var s Student
+```
+
+Then the fields become:
+
+* `Name` → `""`
+* `Age` → `0`
+* `Active` → `false`
+
+### Example
+
+```go
+package main
+
+import "fmt"
+
+type Student struct {
+	Name   string
+	Age    int
+	Active bool
+}
+
+func main() {
+	var s Student
+	fmt.Printf("%q %d %v\n", s.Name, s.Age, s.Active)
+}
+```
+
+### Output
+
+```go
+"" 0 false
+```
+
+### Python difference
+
+In Python, if you do not define values properly, you often get:
+
+* `AttributeError`
+* or `None`
+* or dynamic behavior
+
+In Go, every field has a default zero value.
+This is useful, but it can also hide bugs if you forget validation.
+
+Example:
+
+* `Status == ""` is possible
+* `RepoURL == ""` is possible
+* `PRNumber == 0` is possible
+
+That is why validation matters.
+
+---
+
+## 4. Beginner-friendly explanation of methods
+
+A **method** is a function attached to a type.
+
+In Python:
+
+```python
+class User:
+    def greet(self):
+        print("hello")
+```
+
+In Go:
+
+```go
+type User struct {
+	Name string
+}
+
+func (u User) Greet() {
+	fmt.Println("Hello,", u.Name)
+}
+```
+
+### Full example
+
+```go
+package main
+
+import "fmt"
+
+type User struct {
+	Name string
+}
+
+func (u User) Greet() {
+	fmt.Println("Hello,", u.Name)
+}
+
+func main() {
+	u := User{Name: "Radhe"}
+	u.Greet()
+}
+```
+
+### Output
+
+```go
+Hello, Radhe
+```
+
+---
+
+## Method receiver
 
 This part:
 
 ```go
-func (r Rectangle) Area() float64
+func (u User) Greet()
 ```
 
-means `Area` is a method on `Rectangle`.
+means `Greet` is a method on `User`.
 
-`r` is called the receiver.
-
-You can think of it like:
-
-* `rect.Area()`
-* method works using `rect` data
+`u` is called the **receiver**.
 
 ---
 
-### In project terms
+## Value receiver vs pointer receiver
 
-Your event model may have methods like:
+You do not need deep mastery today, but know this basic rule:
 
-* `Validate() error`
-* `Summary() string`
-* `ToSlackMessage() string`
+### Value receiver
 
-That makes the model smarter and more useful.
+Gets a copy.
+
+```go
+func (u User) PrintName() {
+	fmt.Println(u.Name)
+}
+```
+
+### Pointer receiver
+
+Can modify the original struct.
+
+```go
+func (u *User) UpdateName(newName string) {
+	u.Name = newName
+}
+```
+
+### Example
+
+```go
+package main
+
+import "fmt"
+
+type User struct {
+	Name string
+}
+
+func (u *User) UpdateName(newName string) {
+	u.Name = newName
+}
+
+func main() {
+	u := User{Name: "Old"}
+	u.UpdateName("New")
+	fmt.Println(u.Name)
+}
+```
+
+### Output
+
+```go
+New
+```
+
+### Python comparison
+
+Python objects are reference-like by default, so mutation feels natural.
+
+Go makes this more explicit:
+
+* value receiver = copy-like behavior
+* pointer receiver = modify original
+
+This explicitness is one of Go’s style differences.
 
 ---
 
 ## 5. Explanation of packages and why real projects split code into packages
 
-### What is a package?
+## What is a package?
 
-A package is a way to organize Go code.
+A package is a way to group related code files together.
 
-All files in the same folder usually belong to one package.
+In Python, this is similar to:
 
-Example:
+* modules
+* packages
+* folders with reusable logic
 
-```go
-package model
-```
+### Example mental mapping
 
-or
-
-```go
-package slack
-```
+| Python              | Go              |
+| ------------------- | --------------- |
+| `utils.py`          | package `utils` |
+| `models.py`         | package `model` |
+| `services/slack.py` | package `slack` |
+| `main.py`           | `package main`  |
 
 ---
 
-### Why packages matter
+## Why split code into packages?
 
-If all code is inside `main.go`, the project becomes messy very quickly.
+Because real projects should not keep everything inside one file.
 
-Real projects split code so each package has a clear job.
+That becomes hard to read, test, and maintain.
 
-Example structure:
+### Good separation
+
+* `main.go` → input and wiring
+* `model` → data structures and validation
+* `router` → decision logic
+* `slack` → Slack sending logic
+* `githubclient` → GitHub API calls
+
+---
+
+## Example project layout
 
 ```text
 slack-integration/
+├── go.mod
 ├── cmd/
-│   └── app/
+│   └── cli/
 │       └── main.go
 ├── internal/
 │   ├── model/
-│   │   └── event.go
+│   │   ├── pipeline_event.go
+│   │   ├── validation.go
+│   │   └── notification_request.go
 │   ├── router/
 │   │   └── router.go
-│   ├── slack/
-│   │   └── client.go
-│   └── validator/
-│       └── validator.go
+│   └── slack/
+│       └── client.go
+```
+
+You can also keep it simpler in the beginning:
+
+```text
+slack-integration/
 ├── go.mod
+├── main.go
+├── model/
+│   ├── pipeline_event.go
+│   └── validation.go
+├── router/
+│   └── router.go
+└── slack/
+    └── client.go
 ```
 
 ---
 
-### Simple package responsibility idea
+## Exported vs unexported names
 
-* `main` -> entry point
-* `model` -> structs and model methods
-* `router` -> chooses where to send event
-* `slack` -> sends message to Slack
-* `validator` -> extra validation helpers if needed
+This is a very important Go rule.
 
----
+### Exported name
 
-### Why split code?
-
-Because each folder should answer one question:
-
-* model -> what data are we working with?
-* router -> where should it go?
-* slack -> how do we send it?
-* main -> how does the program start?
-
-This makes code:
-
-* easier to read
-* easier to test
-* easier to debug
-* easier to extend
-
----
-
-## 6. Explain the event model in the project
-
-### What is an event model?
-
-An event model is a struct that represents one event in a clean typed form.
-
-In your CLI-based DevOps style project, raw input may come like this:
-
-```bash
-./app --event pull_request --status success --repo onboarding --branch feature-x --author radhe
-```
-
-These are raw strings from CLI flags.
-
-The program should convert them into one typed model:
+Starts with a capital letter.
 
 ```go
 type PipelineEvent struct {
 	EventType string
 	Status    string
-	RepoName  string
-	Branch    string
-	Author    string
 }
 ```
 
-Now the event is one proper object.
+These can be accessed from other packages.
 
 ---
 
-### Why is this called a model?
+### Unexported name
 
-Because it models a real business object.
+Starts with a small letter.
 
-In your case, that business object is:
+```go
+type pipelineConfig struct {
+	retryCount int
+}
+```
 
-* pipeline event
-* notification request
-* PR state update
-* CI/CD status event
+These are private to the package.
 
 ---
 
-### Where the event model sits in full architecture
+## Example
+
+Inside package `model`:
+
+```go
+package model
+
+type PipelineEvent struct {
+	EventType string
+	Status    string
+}
+
+func (e PipelineEvent) Validate() error {
+	return nil
+}
+```
+
+From `main.go`, you can use:
+
+```go
+event := model.PipelineEvent{}
+err := event.Validate()
+```
+
+But if the field or function name starts with lowercase, other packages cannot access it.
+
+---
+
+## Python comparison
+
+Python has convention-based privacy:
+
+* `_name` means “internal”
+* but still accessible
+
+Go has package-level visibility based on capitalization:
+
+* `Name` = public/exported
+* `name` = private/unexported
+
+This is a major convention change from Python.
+
+---
+
+## 6. Explain the event model in the project
+
+Now let us connect this to your CLI + Slack-style project.
+
+The program receives raw input such as:
+
+* event type
+* pipeline name
+* status
+* repo
+* branch
+* commit SHA
+* author
+* message
+
+That input is first **plain raw data**.
+
+But the project should not pass these as loose strings everywhere.
+
+Instead, it should convert them into one model object:
+
+```go
+type PipelineEvent struct {
+	EventType string
+	Pipeline  string
+	Status    string
+	Repo      string
+	Branch    string
+	CommitSHA string
+	Author    string
+	Message   string
+}
+```
+
+This object becomes the **event model**.
+
+---
+
+## Why is it called an event model?
+
+Because it represents one meaningful thing that happened in the system.
+
+Examples:
+
+* PR opened
+* PR merged
+* pipeline started
+* pipeline failed
+* deployment succeeded
+
+Instead of saying:
+
+> here are 8 random strings
+
+we say:
+
+> here is one `PipelineEvent`
+
+That is much cleaner.
+
+---
+
+## Where the event model sits in the architecture
 
 ```text
-User CLI Input
-    |
-    v
-main.go parses flags
-    |
-    v
+CLI Flags / Raw Input
+        |
+        v
+    main.go
+        |
+        v
 Build PipelineEvent struct
-    |
-    v
-Validate PipelineEvent
-    |
-    v
-Pass event to router/service
-    |
-    v
-Build message / send to Slack / print / log
+        |
+        v
+Validate event in model layer
+        |
+        v
+Router decides where to send it
+        |
+        v
+Slack client / other integrations
 ```
 
 ---
 
-### Full architecture view
+## Full architecture position
 
 ```text
 +------------------+
-| CLI User         |
-| --event success  |
-| --repo demo      |
+| Terminal / User  |
++------------------+
+         |
+         v
++------------------+
+| CLI flags        |
+| --event          |
+| --status         |
+| --repo           |
 +------------------+
          |
          v
 +------------------+
 | main.go          |
-| parse flags      |
-| build struct     |
+| parse input      |
+| create model     |
 +------------------+
          |
          v
@@ -490,13 +615,14 @@ Build message / send to Slack / print / log
          |
          v
 +------------------+
-| router/service   |
-| business logic   |
+| router package   |
+| route by type    |
+| route by status  |
 +------------------+
          |
          v
 +------------------+
-| slack/client     |
+| slack package    |
 | send message     |
 +------------------+
 ```
@@ -505,221 +631,253 @@ Build message / send to Slack / print / log
 
 ## 7. Show how `main.go` should build a `PipelineEvent` or similar model
 
-Below is the basic idea.
+The job of `main.go` should be:
 
-### Raw values come from flags
+1. Read flags
+2. Put them into a struct
+3. Validate the struct
+4. Pass the struct to the next layer
 
-```go
-eventType := flag.String("event", "", "event type")
-status := flag.String("status", "", "pipeline status")
-repo := flag.String("repo", "", "repository name")
-branch := flag.String("branch", "", "branch name")
-author := flag.String("author", "", "author name")
+### Good `main.go` thinking
+
+```text
+raw flags --> typed struct --> validate --> process
 ```
 
-### Build struct after parsing
+### Not good
+
+```text
+raw flags --> random if/else everywhere --> pass 8 strings --> more checks later --> confusion
+```
+
+---
+
+## Example model fields
 
 ```go
-event := model.PipelineEvent{
-	EventType: *eventType,
-	Status:    *status,
-	RepoName:  *repo,
-	Branch:    *branch,
-	Author:    *author,
+type PipelineEvent struct {
+	EventType string
+	Status    string
+	RepoURL   string
+	Branch    string
+	CommitSHA string
+	Author    string
 }
 ```
 
-### Validate
+Then `main.go` can do:
+
+```go
+event := model.PipelineEvent{
+	EventType: eventTypeFlag,
+	Status:    statusFlag,
+	RepoURL:   repoFlag,
+	Branch:    branchFlag,
+	CommitSHA: shaFlag,
+	Author:    authorFlag,
+}
+```
+
+Then:
 
 ```go
 if err := event.Validate(); err != nil {
 	fmt.Println("validation error:", err)
-	os.Exit(1)
+	return
 }
 ```
+
+This is the clean way.
 
 ---
 
 ## 8. Explain why passing a struct is better than passing many loose values
 
-This is one of the biggest lessons today.
+Let us compare.
 
----
-
-### Loose values approach
+## Loose values approach
 
 ```go
-func ProcessEvent(eventType string, status string, repo string, branch string, author string) {
-	// process
+func SendNotification(eventType string, status string, repo string, branch string, sha string, author string) {
+	// ...
 }
 ```
 
 Problem:
 
-* too many arguments
-* hard to remember order
-* easy to mix values
-* not scalable when fields grow
-* less readable
-* validation becomes messy
+* hard to read
+* hard to remember parameter order
+* easier to pass wrong value in wrong place
+* harder to extend later
 
-Bad call:
+Example bug:
 
 ```go
-ProcessEvent("success", "pull_request", "main", "demo-repo", "radhe")
+SendNotification("pipeline", "success", branch, repo, sha, author)
 ```
 
-Can you quickly tell what each value means? Hard.
+Oops. `branch` and `repo` got swapped.
 
 ---
 
-### Struct approach
+## Struct approach
 
 ```go
-func ProcessEvent(event PipelineEvent) {
-	// process
+func SendNotification(event model.PipelineEvent) {
+	// ...
 }
 ```
 
-Call:
+Benefits:
 
-```go
-ProcessEvent(event)
-```
-
-This is better because:
-
-* related data stays together
-* easier to pass around
-* easier to validate
-* easier to extend with new fields
-* better readability
-* better testability
+1. one clean object
+2. field names are clear
+3. easier to extend
+4. easier to validate
+5. easier to log
+6. easier to test
+7. better for future growth
 
 ---
 
-### Best mental model
+## Python comparison
 
-Loose variables are like carrying 8 separate papers in your hand.
+Python often uses:
 
-A struct is like putting all those papers into one labeled folder.
+* dict
+* dataclass
+* class instance
 
-Much safer. Much cleaner.
+Go strongly prefers struct for this kind of modeling.
+
+### Python dict version
+
+```python
+event = {
+    "event_type": "pipeline",
+    "status": "success",
+    "repo": "my-repo"
+}
+```
+
+Flexible, but less safe.
+
+### Go struct version
+
+```go
+event := PipelineEvent{
+	EventType: "pipeline",
+	Status:    "success",
+	RepoURL:   "my-repo",
+}
+```
+
+More explicit and safer.
 
 ---
 
 ## 9. Pseudocode first for event creation and validation
 
-### Pseudocode
+## Pseudocode: create event from CLI
 
 ```text
 START
 
-Read CLI flags:
-  event type
+read flags:
+  eventType
   status
-  repo name
+  repoURL
   branch
+  commitSHA
   author
 
-Create PipelineEvent object with these values
+create PipelineEvent object using those values
 
-Call Validate on PipelineEvent
+validate the event:
+  if eventType is empty -> error
+  if status is empty -> error
+  if repoURL is empty -> error
+  if status is not one of allowed values -> error
 
-If validation fails:
+if validation fails:
   print error
-  exit program
+  stop program
 
-If validation passes:
-  print event summary
-  send to next layer
+if validation passes:
+  send event to router
+  router decides next action
 
 END
 ```
 
 ---
 
-### Validation pseudocode
+## Pseudocode: model validation
 
 ```text
-FUNCTION Validate(event):
-  IF event type is empty:
-      return error
+function Validate(event):
+  if event.EventType is empty:
+      return error "event type is required"
 
-  IF status is empty:
-      return error
+  if event.Status is empty:
+      return error "status is required"
 
-  IF repo name is empty:
-      return error
+  if event.Status not in [started, success, failed]:
+      return error "invalid status"
 
-  IF status is not one of [started, success, failed]:
-      return error
+  if event.RepoURL is empty:
+      return error "repo URL is required"
 
-  return nil
+  return no error
 ```
+
+---
+
+## Why validation belongs in model layer
+
+Because the model knows its own rules.
+
+`PipelineEvent` should know:
+
+* which fields are required
+* which values are allowed
+* what makes the event valid
+
+This keeps validation close to the data.
+
+### Good design
+
+* `main.go` parses input
+* `model` validates meaning
+* `router` routes
+* `slack` sends
+
+### Bad design
+
+Put validation everywhere:
+
+* some in `main.go`
+* some in router
+* some in Slack client
+* repeated checks everywhere
+
+That becomes messy very fast.
 
 ---
 
 ## 10. Real code examples with full explanation
 
----
-
-### A. Toy example first
-
-```go
-package main
-
-import "fmt"
-
-type Student struct {
-	Name  string
-	Age   int
-	City  string
-}
-
-func (s Student) Validate() error {
-	if s.Name == "" {
-		return fmt.Errorf("name cannot be empty")
-	}
-	if s.Age <= 0 {
-		return fmt.Errorf("age must be greater than 0")
-	}
-	return nil
-}
-
-func main() {
-	st := Student{
-		Name: "Radhe",
-		Age:  25,
-		City: "Chennai",
-	}
-
-	if err := st.Validate(); err != nil {
-		fmt.Println("validation error:", err)
-		return
-	}
-
-	fmt.Println("student is valid:", st)
-}
-```
-
-### What this teaches
-
-* `Student` is a struct
-* `Validate()` is a method
-* validation checks zero or invalid values
-* method keeps logic close to the data
+We will now build a beginner-friendly version.
 
 ---
 
-### B. Project-style example
-
-#### File: `internal/model/event.go`
+## File: `model/pipeline_event.go`
 
 ```go
 package model
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -727,130 +885,121 @@ import (
 type PipelineEvent struct {
 	EventType string
 	Status    string
-	RepoName  string
+	RepoURL   string
 	Branch    string
+	CommitSHA string
 	Author    string
+	Message   string
 }
 
+// Normalize cleans input before validation or routing.
+func (e *PipelineEvent) Normalize() {
+	e.EventType = strings.TrimSpace(strings.ToLower(e.EventType))
+	e.Status = strings.TrimSpace(strings.ToLower(e.Status))
+	e.RepoURL = strings.TrimSpace(e.RepoURL)
+	e.Branch = strings.TrimSpace(e.Branch)
+	e.CommitSHA = strings.TrimSpace(e.CommitSHA)
+	e.Author = strings.TrimSpace(e.Author)
+	e.Message = strings.TrimSpace(e.Message)
+}
+
+// Validate checks whether the event has the minimum required valid data.
 func (e PipelineEvent) Validate() error {
-	if strings.TrimSpace(e.EventType) == "" {
-		return fmt.Errorf("event type is required")
-	}
-	if strings.TrimSpace(e.Status) == "" {
-		return fmt.Errorf("status is required")
-	}
-	if strings.TrimSpace(e.RepoName) == "" {
-		return fmt.Errorf("repo name is required")
-	}
-	if strings.TrimSpace(e.Branch) == "" {
-		return fmt.Errorf("branch is required")
-	}
-	if strings.TrimSpace(e.Author) == "" {
-		return fmt.Errorf("author is required")
+	if e.EventType == "" {
+		return errors.New("event type is required")
 	}
 
-	switch e.Status {
-	case "started", "success", "failed":
-		return nil
-	default:
+	if e.Status == "" {
+		return errors.New("status is required")
+	}
+
+	if e.RepoURL == "" {
+		return errors.New("repo URL is required")
+	}
+
+	allowedStatus := map[string]bool{
+		"started": true,
+		"success": true,
+		"failed":  true,
+	}
+
+	if !allowedStatus[e.Status] {
 		return fmt.Errorf("invalid status: %s", e.Status)
 	}
-}
 
-func (e PipelineEvent) Summary() string {
-	return fmt.Sprintf(
-		"event=%s status=%s repo=%s branch=%s author=%s",
-		e.EventType, e.Status, e.RepoName, e.Branch, e.Author,
-	)
+	return nil
 }
 ```
 
 ---
 
-#### Full explanation
+## Explanation
 
-##### `package model`
+### `type PipelineEvent struct`
 
-This file belongs to the `model` package.
+This defines the model.
 
-##### Struct
+### `Normalize()`
 
-```go
-type PipelineEvent struct {
-	EventType string
-	Status    string
-	RepoName  string
-	Branch    string
-	Author    string
-}
-```
+This is useful because user input may contain:
 
-This defines the event shape.
-
-##### Why these names start with capital letters
-
-Because capitalized names are **exported** in Go.
-
-That means other packages can use them.
-
-So `main.go` can do this:
-
-```go
-model.PipelineEvent{}
-```
-
-If the name was lowercase like `pipelineEvent`, it would not be visible outside the package.
-
----
-
-#### Exported vs unexported names
-
-Very important rule:
-
-* Capital letter -> exported
-* Small letter -> unexported
+* extra spaces
+* uppercase/lowercase mismatch
 
 Example:
 
-```go
-type PipelineEvent struct{}   // exported
-type pipelineEvent struct{}   // unexported
-```
+* `" Success "` should become `"success"`
+
+### Why pointer receiver in `Normalize()`?
+
+Because it changes the original struct.
 
 ```go
-func BuildEvent() {}          // exported
-func buildEvent() {}          // unexported
+func (e *PipelineEvent) Normalize()
 ```
 
-Use exported names when another package must use them.
+This means the method updates the actual event.
 
-Use unexported names for internal helpers.
+### Why value receiver in `Validate()`?
+
+Because validation only reads values, it does not change them.
+
+```go
+func (e PipelineEvent) Validate() error
+```
 
 ---
 
-#### Why `Validate()` is in the model
-
-Because validation is directly about the model’s correctness.
-
-The model itself should know:
-
-* what fields are required
-* which values are valid
-* what makes it broken
-
-That is why this is good:
+## File: `model/notification_request.go`
 
 ```go
-event.Validate()
-```
+package model
 
-instead of putting all validation randomly in `main.go`.
+type NotificationRequest struct {
+	Channel string
+	Text    string
+	Event    PipelineEvent
+}
+```
 
 ---
 
-### C. `main.go` example
+## Explanation
 
-#### File: `cmd/app/main.go`
+This is another model.
+
+Why have this?
+
+Because sometimes your internal event model and your outgoing notification payload are not the same thing.
+
+That is a very real backend pattern.
+
+* `PipelineEvent` = input/business event
+* `NotificationRequest` = outgoing notification object
+
+---
+
+## File: `main.go`
 
 ```go
 package main
@@ -858,74 +1007,129 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 
-	"slack-integration/internal/model"
+	"slack-integration/model"
 )
 
 func main() {
-	eventType := flag.String("event", "", "event type")
-	status := flag.String("status", "", "pipeline status")
-	repo := flag.String("repo", "", "repository name")
+	eventType := flag.String("event", "", "event type like pipeline or pr")
+	status := flag.String("status", "", "status like started, success, failed")
+	repoURL := flag.String("repo", "", "repository URL")
 	branch := flag.String("branch", "", "branch name")
+	commitSHA := flag.String("sha", "", "commit sha")
 	author := flag.String("author", "", "author name")
+	message := flag.String("message", "", "custom message")
 
 	flag.Parse()
 
 	event := model.PipelineEvent{
 		EventType: *eventType,
 		Status:    *status,
-		RepoName:  *repo,
+		RepoURL:   *repoURL,
 		Branch:    *branch,
+		CommitSHA: *commitSHA,
 		Author:    *author,
+		Message:   *message,
 	}
+
+	event.Normalize()
 
 	if err := event.Validate(); err != nil {
 		fmt.Println("validation error:", err)
-		os.Exit(1)
+		return
 	}
 
 	fmt.Println("event created successfully")
-	fmt.Println(event.Summary())
+	fmt.Printf("%+v\n", event)
 }
 ```
 
 ---
 
-### Explanation of flow
+## Explanation of `main.go`
 
-```text
-Flags -> raw string values -> PipelineEvent struct -> Validate() -> Summary()
+### Step 1: define flags
+
+```go
+eventType := flag.String("event", "", "event type like pipeline or pr")
 ```
 
-This is exactly the shape of real CLI/backend tools.
+This returns a pointer to string.
+
+That is why later we use `*eventType`.
+
+### Step 2: parse flags
+
+```go
+flag.Parse()
+```
+
+Now the terminal values are loaded.
+
+### Step 3: build a typed model
+
+```go
+event := model.PipelineEvent{ ... }
+```
+
+This is the key step of Day 2.
+
+### Step 4: normalize
+
+```go
+event.Normalize()
+```
+
+Clean input.
+
+### Step 5: validate
+
+```go
+if err := event.Validate(); err != nil
+```
+
+If bad data comes in, stop early.
+
+### Step 6: continue with routing later
+
+For now we just print the event.
 
 ---
 
-### Example run
+## Example run
 
 ```bash
-go run ./cmd/app --event pull_request --status success --repo onboarding --branch main --author radhe
+go run main.go \
+  --event pipeline \
+  --status success \
+  --repo https://github.com/example/repo \
+  --branch main \
+  --sha abc123 \
+  --author radhe \
+  --message "build passed"
 ```
 
-Expected output:
+### Expected output
 
-```text
+```go
 event created successfully
-event=pull_request status=success repo=onboarding branch=main author=radhe
+{EventType:pipeline Status:success RepoURL:https://github.com/example/repo Branch:main CommitSHA:abc123 Author:radhe Message:build passed}
 ```
 
 ---
 
-### Invalid example
+## Example invalid run
 
 ```bash
-go run ./cmd/app --event pull_request --status done --repo onboarding --branch main --author radhe
+go run main.go \
+  --event pipeline \
+  --status done \
+  --repo https://github.com/example/repo
 ```
 
-Output:
+### Output
 
-```text
+```go
 validation error: invalid status: done
 ```
 
@@ -933,42 +1137,57 @@ validation error: invalid status: done
 
 ## 11. File-by-file explanation of the model package
 
-Let us imagine a small model package.
-
-```text
-internal/model/
-├── event.go
-└── notification.go
-```
+Let us explain the model package as if it is a small real project.
 
 ---
 
-### File 1: `event.go`
+## File 1: `model/pipeline_event.go`
 
-Purpose:
+**Purpose:**
+This is the core event model for the program.
 
-* define `PipelineEvent`
-* define validation rules
-* define helper methods like `Summary()`
+**What it contains:**
 
-Example responsibilities:
+* `PipelineEvent` struct
+* fields for event-related data
+* `Normalize()` method
+* `Validate()` method
 
-* event type
-* status
-* repo
-* branch
-* author
+**Why it matters:**
+This file defines the “shape” of the event and the rules for a valid event.
 
-This file is the heart of “typed event input.”
+This is similar to:
+
+* Python class
+* or Pydantic/dataclass-style model thinking
+
+But in Go, we usually write validation manually unless using external libraries.
 
 ---
 
-### File 2: `notification.go`
+## File 2: `model/notification_request.go`
 
-Purpose:
+**Purpose:**
+Represents the outgoing notification payload.
 
-* define `NotificationRequest`
-* maybe convert event into a message-ready format
+**Why separate it from `PipelineEvent`?**
+
+Because one internal model may produce multiple outputs later:
+
+* Slack message
+* email payload
+* log entry
+* webhook payload
+
+So separation gives flexibility.
+
+---
+
+## File 3: `model/validation.go` (optional split)
+
+In small projects, validation can stay inside `pipeline_event.go`.
+
+In slightly larger projects, you may split validation rules into another file.
 
 Example:
 
@@ -976,38 +1195,49 @@ Example:
 package model
 
 import (
+	"errors"
 	"fmt"
-	"strings"
 )
 
-type NotificationRequest struct {
-	Channel string
-	Message string
+func validateRequired(value string, fieldName string) error {
+	if value == "" {
+		return fmt.Errorf("%s is required", fieldName)
+	}
+	return nil
 }
 
-func (n NotificationRequest) Validate() error {
-	if strings.TrimSpace(n.Channel) == "" {
-		return fmt.Errorf("channel is required")
+func (e PipelineEvent) Validate() error {
+	if err := validateRequired(e.EventType, "event type"); err != nil {
+		return err
 	}
-	if strings.TrimSpace(n.Message) == "" {
-		return fmt.Errorf("message is required")
+	if err := validateRequired(e.Status, "status"); err != nil {
+		return err
 	}
+	if err := validateRequired(e.RepoURL, "repo URL"); err != nil {
+		return err
+	}
+
+	allowedStatus := map[string]bool{
+		"started": true,
+		"success": true,
+		"failed":  true,
+	}
+
+	if !allowedStatus[e.Status] {
+		return errors.New("status must be one of: started, success, failed")
+	}
+
 	return nil
 }
 ```
 
-This shows how a second model can exist for the next step.
+**Why split?**
 
----
+* keeps model definition shorter
+* keeps validation readable
+* easier to grow later
 
-### Why this separation is useful
-
-`PipelineEvent` = raw business event
-`NotificationRequest` = message sending request
-
-So one model represents “what happened,” and another represents “what to send.”
-
-That is clean architecture thinking.
+For beginners, keeping both in one file is perfectly fine.
 
 ---
 
@@ -1015,356 +1245,402 @@ That is clean architecture thinking.
 
 Do these in order.
 
-### Task 1 — Create a toy struct
+### Task 1
 
-Create a `Student` struct with:
+Create a simple `Student` struct with:
 
-* Name
-* Age
-* City
+* `Name`
+* `Course`
+* `Age`
 
-Then print one student object.
+Print one student.
 
 ---
 
-### Task 2 — Add a method
+### Task 2
 
 Add a method:
 
 ```go
-func (s Student) Introduce() string
+func (s Student) PrintDetails()
 ```
 
-Print something like:
-
-```text
-Hi, I am Radhe from Chennai
-```
+Use it to print the student info.
 
 ---
 
-### Task 3 — Create `PipelineEvent`
+### Task 3
 
-Create a `PipelineEvent` struct with:
+Create a `PipelineEvent` struct with fields:
 
-* EventType
-* Status
-* RepoName
-* Branch
-* Author
+* `EventType`
+* `Status`
+* `RepoURL`
+* `Branch`
 
----
-
-### Task 4 — Add `Validate()` method
-
-Rules:
-
-* all fields required
-* status must be one of:
-
-  * started
-  * success
-  * failed
+Create one event and print it.
 
 ---
 
-### Task 5 — Build event from CLI flags
+### Task 4
 
-Read flags from `main.go`, build `PipelineEvent`, validate it, then print summary.
+Add a `Validate()` method that checks:
+
+* `EventType` not empty
+* `Status` not empty
+* `RepoURL` not empty
 
 ---
 
-### Task 6 — Add `NotificationRequest`
+### Task 5
 
-Create another model:
+Add `Normalize()` so status becomes lowercase and trimmed.
 
-* Channel
-* Message
+---
 
-Add `Validate()` method.
+### Task 6
+
+Use CLI flags in `main.go` to fill the event model.
+
+---
+
+### Task 7
+
+Print validation error if input is bad.
 
 ---
 
 ## 13. Expected output
 
-### Task 1 output idea
-
-```text
-{Name:Radhe Age:25 City:Chennai}
-```
-
----
-
-### Task 2 output idea
-
-```text
-Hi, I am Radhe from Chennai
-```
-
----
-
-### Task 5 valid run
-
-Command:
+If you run valid input:
 
 ```bash
-go run . --event pull_request --status success --repo onboarding --branch main --author radhe
+go run main.go --event pipeline --status success --repo repo-url --branch main
 ```
 
-Output:
+Expected:
 
-```text
+```go
 event created successfully
-event=pull_request status=success repo=onboarding branch=main author=radhe
+{EventType:pipeline Status:success RepoURL:repo-url Branch:main CommitSHA: Author: Message:}
 ```
 
----
+Notice the empty fields.
 
-### Task 5 invalid run
+That is because of **zero values**.
 
-Command:
+* missing strings become `""`
 
-```bash
-go run . --event pull_request --status done --repo onboarding --branch main --author radhe
-```
-
-Output:
-
-```text
-validation error: invalid status: done
-exit status 1
-```
+This is normal in Go.
 
 ---
 
 ## 14. Common mistakes
 
-Here are the most common beginner mistakes today:
+Here are beginner mistakes you will likely hit.
 
 ### 1. Forgetting capital letters for exported names
 
-Wrong if used outside package:
+Wrong:
 
 ```go
-type pipelineEvent struct {}
+type PipelineEvent struct {
+	eventType string
+}
+```
+
+If another package needs it, this will fail.
+
+Right:
+
+```go
+type PipelineEvent struct {
+	EventType string
+}
+```
+
+---
+
+### 2. Forgetting to dereference flag pointers
+
+Wrong:
+
+```go
+EventType: eventType,
 ```
 
 Right:
 
 ```go
-type PipelineEvent struct {}
+EventType: *eventType,
 ```
 
 ---
 
-### 2. Forgetting to call `flag.Parse()`
+### 3. Putting too much logic in `main.go`
 
-If you do not call it, your flags may stay empty.
+Bad habit:
 
----
+* parsing
+* validation
+* routing
+* Slack sending
+* formatting
 
-### 3. Confusing struct field names with local variables
+all in one file
 
-This is okay:
+Better:
 
-```go
-event := model.PipelineEvent{
-	EventType: *eventType,
-}
-```
-
-But beginners sometimes mix field name and variable name.
+* `main.go` stays small
+* model validates itself
+* routing happens elsewhere
 
 ---
 
 ### 4. Ignoring zero values
 
-If a user does not provide a flag, the value may become empty string `""`.
+If user forgets `--status`, Go does not crash.
+It gives `""`.
 
-You must validate it.
-
----
-
-### 5. Putting all validation in `main.go`
-
-This makes `main.go` too big and messy.
+That means validation is required.
 
 ---
 
-### 6. Passing too many loose variables
+### 5. Confusing function and method
 
-This makes functions hard to understand.
+Function:
+
+```go
+func ValidateEvent(e PipelineEvent) error
+```
+
+Method:
+
+```go
+func (e PipelineEvent) Validate() error
+```
+
+Both are valid, but method is more natural here because validation belongs to the model.
 
 ---
 
-### 7. Using package names wrongly
+### 6. Using loose values everywhere
 
-Folder name and package name should make sense.
+This becomes unreadable quickly.
+
+Prefer one struct.
 
 ---
 
 ## 15. Debugging tips
 
-### Tip 1 — Print the struct
+### Tip 1: print the struct
 
-Before validation, print the struct:
+Use:
 
 ```go
 fmt.Printf("%+v\n", event)
 ```
 
-This shows field names and values.
+This shows field names too.
+
+---
+
+### Tip 2: print values before validation
+
+```go
+fmt.Printf("raw event: %+v\n", event)
+```
+
+This helps you see empty fields.
+
+---
+
+### Tip 3: test invalid input on purpose
+
+Try:
+
+* missing `--status`
+* wrong status like `done`
+* extra spaces like `" Success "`
+
+This helps you understand normalization and validation.
+
+---
+
+### Tip 4: check package name and import path
+
+If import fails, verify:
+
+* folder name
+* package name
+* module path in `go.mod`
+
+---
+
+### Tip 5: read compiler errors slowly
+
+Go errors are often direct and useful.
 
 Example:
 
-```text
-{EventType:pull_request Status:success RepoName:onboarding Branch:main Author:radhe}
+* undefined field
+* cannot use `*string` as `string`
+* unused variable
+
+These usually tell you exactly what is wrong.
+
+---
+
+## 16. One DSA topic — string basics simply
+
+Today’s DSA topic is **strings**.
+
+## What is a string?
+
+A string is a sequence of characters.
+
+Examples:
+
+```go
+name := "radhe"
+status := "success"
 ```
 
 ---
 
-### Tip 2 — Print raw flag values
+## Common string operations in Go
+
+### Length
 
 ```go
-fmt.Println("event:", *eventType)
-fmt.Println("status:", *status)
+fmt.Println(len("go"))
 ```
 
-This helps confirm CLI parsing is working.
-
----
-
-### Tip 3 — Check zero values
-
-If something prints blank, it may be `""`.
-
----
-
-### Tip 4 — Validate one rule at a time
-
-Do not write 20 rules at once.
-
-Start with:
-
-* event required
-* status required
-
-Then add the rest.
-
----
-
-### Tip 5 — Test invalid input deliberately
-
-Test cases:
-
-* missing author
-* empty repo
-* bad status
-
-This helps you trust your validation logic.
-
----
-
-## 16. One DSA topic — String basics in simple language
-
-Today’s DSA topic: **strings in Go**
-
-### What is a string?
-
-A string is text.
-
-Example:
+Output:
 
 ```go
-name := "Radhe"
+2
 ```
 
 ---
 
-### Common string basics
-
-#### Length
+### Compare strings
 
 ```go
-fmt.Println(len(name))
-```
-
-#### Compare
-
-```go
-if name == "Radhe" {
-	fmt.Println("matched")
+if status == "success" {
+	fmt.Println("ok")
 }
 ```
 
-#### Join strings
+---
+
+### Join strings
 
 ```go
-full := "Hello " + name
+message := "build " + "passed"
 ```
-
-#### Loop through characters
-
-Simple way:
-
-```go
-for i := 0; i < len(name); i++ {
-	fmt.Println(string(name[i]))
-}
-```
-
-For beginners, this is enough for now.
 
 ---
 
-### Why strings matter in backend work
+### Trim spaces
 
-You will use strings for:
+```go
+strings.TrimSpace(" success ")
+```
 
-* event type
-* repo name
-* branch name
-* author
-* messages
-* Slack content
-* JSON fields
-* log messages
+---
 
-So string basics are directly useful in your project.
+### Convert case
+
+```go
+strings.ToLower("SUCCESS")
+```
+
+---
+
+## Python comparison
+
+### Python
+
+```python
+name.lower()
+name.strip()
+len(name)
+```
+
+### Go
+
+```go
+strings.ToLower(name)
+strings.TrimSpace(name)
+len(name)
+```
+
+### Main difference
+
+Python strings have methods on the object.
+Go uses package functions from `strings`.
+
+---
+
+## Important note for beginners
+
+Go strings are UTF-8 text.
+For advanced character handling, runes matter.
+
+But for now, basic CLI/backend use usually starts with:
+
+* compare
+* trim
+* lowercase
+* contains
+* split
+
+That is enough for Day 2.
 
 ---
 
 ## 17. One easy Go DSA problem
 
-### Problem: Count vowels in a string
+## Problem: Count vowels in a string
 
-Given a string, count how many vowels are present.
+Given a string, count how many vowels it contains.
 
-Example:
+### Example
 
-```text
-Input:  "radhe"
-Output: 2
+Input:
+
+```go
+"golang"
 ```
 
-Because vowels are `a` and `e`.
+Output:
+
+```go
+2
+```
+
+Because vowels are `o` and `a`.
 
 ---
 
-### Simple solution in Go
+## Go solution
 
 ```go
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func countVowels(s string) int {
+	s = strings.ToLower(s)
 	count := 0
 
-	for i := 0; i < len(s); i++ {
-		ch := s[i]
-		if ch == 'a' || ch == 'e' || ch == 'i' || ch == 'o' || ch == 'u' ||
-			ch == 'A' || ch == 'E' || ch == 'I' || ch == 'O' || ch == 'U' {
+	for _, ch := range s {
+		if ch == 'a' || ch == 'e' || ch == 'i' || ch == 'o' || ch == 'u' {
 			count++
 		}
 	}
@@ -1373,138 +1649,139 @@ func countVowels(s string) int {
 }
 
 func main() {
-	fmt.Println(countVowels("radhe"))
+	fmt.Println(countVowels("Golang")) // 2
 }
-```
-
-Output:
-
-```text
-2
 ```
 
 ---
 
-### Why this problem is good for Day 2
+## Explanation
 
-Because it helps you practice:
-
-* strings
-* loops
-* conditions
-* function writing
+* `strings.ToLower` makes comparison easy
+* `for _, ch := range s` loops through characters
+* if character is vowel, increment count
 
 ---
 
 ## 18. One module-based practice task
 
-Create this small package:
+Create a small model package with a `NotificationRequest` or `PipelineEvent` style object.
+
+## Practice requirement
+
+Create this folder structure:
 
 ```text
-internal/model/
-└── notification_request.go
+practice/
+├── go.mod
+├── main.go
+└── model/
+    └── notification_request.go
 ```
-
-### Requirement
-
-Create a model:
-
-```go
-type NotificationRequest struct {
-	Channel string
-	Message string
-}
-```
-
-Add methods:
-
-* `Validate() error`
-* `Summary() string`
-
-### Rules
-
-* `Channel` cannot be empty
-* `Message` cannot be empty
 
 ---
 
-### Sample code
+## File: `model/notification_request.go`
 
 ```go
 package model
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 )
 
 type NotificationRequest struct {
 	Channel string
-	Message string
+	Text    string
+	Source  string
+}
+
+func (n *NotificationRequest) Normalize() {
+	n.Channel = strings.TrimSpace(strings.ToLower(n.Channel))
+	n.Text = strings.TrimSpace(n.Text)
+	n.Source = strings.TrimSpace(strings.ToLower(n.Source))
 }
 
 func (n NotificationRequest) Validate() error {
-	if strings.TrimSpace(n.Channel) == "" {
-		return fmt.Errorf("channel is required")
+	if n.Channel == "" {
+		return errors.New("channel is required")
 	}
-	if strings.TrimSpace(n.Message) == "" {
-		return fmt.Errorf("message is required")
+	if n.Text == "" {
+		return errors.New("text is required")
+	}
+	if n.Source == "" {
+		return errors.New("source is required")
 	}
 	return nil
 }
-
-func (n NotificationRequest) Summary() string {
-	return fmt.Sprintf("channel=%s message=%s", n.Channel, n.Message)
-}
 ```
 
-### Practice from `main.go`
+---
+
+## File: `main.go`
 
 ```go
-req := model.NotificationRequest{
-	Channel: "slack-devops",
-	Message: "Pipeline completed successfully",
-}
+package main
 
-if err := req.Validate(); err != nil {
-	fmt.Println("validation error:", err)
-	return
-}
+import (
+	"fmt"
 
-fmt.Println(req.Summary())
+	"practice/model"
+)
+
+func main() {
+	req := model.NotificationRequest{
+		Channel: " Deployments ",
+		Text:    " Build succeeded ",
+		Source:  " CLI ",
+	}
+
+	req.Normalize()
+
+	if err := req.Validate(); err != nil {
+		fmt.Println("validation error:", err)
+		return
+	}
+
+	fmt.Printf("valid request: %+v\n", req)
+}
 ```
+
+---
+
+## What this teaches
+
+1. custom model type
+2. package usage
+3. exported fields
+4. method usage
+5. normalization
+6. validation
+7. struct-based design
+
+This is exactly the same pattern your real project will use.
 
 ---
 
 ## 19. Revision checkpoint
 
-Before ending Day 2, make sure you can answer these:
+Before moving to Day 3, make sure you can answer these:
 
-### Structs
+1. What is a struct in Go?
+2. How is a struct different from passing loose variables?
+3. What is a method?
+4. What is the difference between value receiver and pointer receiver?
+5. What is a package?
+6. Why do real projects split code into packages?
+7. What does exported vs unexported mean?
+8. What is a zero value in Go?
+9. Why is validation needed?
+10. Why should validation belong in the model layer?
+11. How does raw CLI input become a typed event object?
+12. Where does the event model sit in the architecture?
 
-* What is a struct?
-* Why is struct better than loose variables?
-* What are zero values?
-
-### Methods
-
-* What is a method?
-* Why attach `Validate()` to a struct?
-
-### Packages
-
-* Why do we split code into packages?
-* What is exported vs unexported?
-
-### Project architecture
-
-* How does raw CLI input become a typed model?
-* Why does validation belong in the model layer?
-
-### DSA
-
-* How do you loop through a string in Go?
-* How would you count vowels?
+If you can explain these in simple words, Day 2 is successful.
 
 ---
 
@@ -1512,97 +1789,111 @@ Before ending Day 2, make sure you can answer these:
 
 Do these carefully.
 
-### Homework 1
+### Homework Part A — toy level
 
-Create a `PipelineEvent` struct and `Validate()` method.
+Create a `Book` struct with:
 
----
+* `Title`
+* `Author`
+* `Pages`
 
-### Homework 2
+Add a method:
 
-Add a `Summary()` method.
-
-Example output:
-
-```text
-event=pull_request status=started repo=demo branch=feature-1 author=radhe
+```go
+func (b Book) PrintInfo()
 ```
 
 ---
 
-### Homework 3
+### Homework Part B — project level
 
-Create a second model called `NotificationRequest`.
+Create a `PipelineEvent` model with these fields:
 
-Fields:
+* `EventType`
+* `Status`
+* `RepoURL`
+* `Branch`
+* `Author`
 
-* Channel
-* Message
+Add:
 
-Add validation.
+* `Normalize()`
+* `Validate()`
 
----
+Validation rules:
 
-### Homework 4
-
-From `main.go`, first build `PipelineEvent`, validate it, then create `NotificationRequest` from it.
-
-Flow:
-
-```text
-CLI input -> PipelineEvent -> Validate -> build message -> NotificationRequest -> Validate
-```
+* all fields required except `Author`
+* status must be one of `started`, `success`, `failed`
 
 ---
 
-### Homework 5
+### Homework Part C — CLI level
 
-Solve this string problem in Go:
+Update `main.go` to accept flags and build the struct from terminal input.
 
-**Count how many times the letter `a` appears in a string**
+---
 
-Example:
+### Homework Part D — practice thinking
 
-```text
-Input:  "banana"
-Output: 3
-```
+Answer in your own words:
+
+1. Why is a struct better than many loose values?
+2. Why should Slack client not receive random strings one by one?
+3. Why is model validation safer than checking fields everywhere?
 
 ---
 
 # Final mental model for Day 2
 
-Today’s biggest idea is this:
+Think of Day 2 like this:
 
 ```text
-raw input is messy
-typed struct is clean
-validation protects the system
-packages keep code organized
-methods keep behavior near data
+Day 1:
+CLI input enters the program
+
+Day 2:
+That raw input is converted into a clean typed model
+
+Later:
+That model will move through router, integrations, and workflows
 ```
 
-And in project form:
+Or even shorter:
 
 ```text
-CLI flags
-   |
-   v
-main.go
-   |
-   v
-build PipelineEvent
-   |
-   v
-event.Validate()
-   |
-   v
-pass clean event to next layer
-   |
-   v
-router / notifier / Slack client
+raw input -> struct -> validate -> route -> act
 ```
 
-That is exactly how a real backend or DevOps CLI starts becoming production-friendly.
+That is one of the most important backend patterns you can learn.
 
-When you are ready, send **Day 3 prompt**.
+---
+
+# Python-to-Go mental mapping for today
+
+| Python idea                         | Go idea                             |
+| ----------------------------------- | ----------------------------------- |
+| class with attributes               | struct                              |
+| instance method                     | method with receiver                |
+| module/package                      | package                             |
+| `_private` convention               | lowercase unexported                |
+| public name                         | Capitalized exported                |
+| dynamic dict input                  | typed struct                        |
+| validation via class/Pydantic logic | validation method on struct         |
+| `None`/missing cases                | zero values like `""`, `0`, `false` |
+
+---
+
+# Tiny summary
+
+Today you learned:
+
+* structs group related data
+* methods attach behavior to data
+* packages organize code
+* capitalization controls visibility
+* zero values are real and important
+* raw CLI input should become a typed event model
+* validation belongs near the model
+* this pattern is exactly how real backend/CLI projects stay clean
+
+Ask for **Day 3**, and I will teach you how this validated event moves into **router/service/integration layers**, with more project-style flow.
