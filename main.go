@@ -24,9 +24,9 @@ func main() {
 
 	fmt.Println("Hello from Go CLI", *user, *event, *repo)
 	inputEvent := Event{
-		User: *user,
+		User:      *user,
 		EventType: *event,
-		Repo: *repo,
+		Repo:      *repo,
 	}
 	fmt.Printf("New Event: %s ", inputEvent)
 	fmt.Printf("\n")
