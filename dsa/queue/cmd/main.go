@@ -2,20 +2,19 @@ package main
 
 import (
 	"fmt"
-
 )
 
-type Queue struct{
+type Queue struct {
 	items []string
 }
 
-func (q *Queue) Enqueue(item string){
+func (q *Queue) Enqueue(item string) {
 	q.items = append(q.items, item)
 }
 
-func (q *Queue) Dequeue()(string, error){
-	if q.IsEmpty(){
-		return "" , fmt.Errorf("queue is empty")
+func (q *Queue) Dequeue() (string, error) {
+	if q.IsEmpty() {
+		return "", fmt.Errorf("queue is empty")
 	}
 	firstItem := q.items[0]
 	q.items = q.items[1:]
@@ -27,15 +26,15 @@ func (q *Queue) IsEmpty() bool {
 	return len(q.items) == 0
 }
 
-func main(){
+func main() {
 	queue := Queue{}
 	queue.Enqueue("pr-event")
 	queue.Enqueue("cd-event")
 	queue.Enqueue("job-event")
 
-	for !queue.IsEmpty(){
+	for !queue.IsEmpty() {
 		event, err := queue.Dequeue()
-		if err!=nil{
+		if err != nil {
 			fmt.Println("error: ", err)
 			return
 		}

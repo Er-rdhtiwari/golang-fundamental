@@ -2,29 +2,29 @@ package main
 
 import "fmt"
 
-type Node struct{
+type Node struct {
 	Value int
-	Next *Node
+	Next  *Node
 }
 
-func CountNodes(head *Node) int{
+func CountNodes(head *Node) int {
 	count := 0
 	current := head
 
-	for current !=nil{
+	for current != nil {
 		count++
-		current= current.Next
+		current = current.Next
 	}
 	return count
 }
 
-func main(){
+func main() {
 	head := &Node{Value: 10}
 	second := &Node{Value: 20}
 	third := &Node{Value: 30}
 
-	head.Next= second
-	second.Next=third
+	head.Next = second
+	second.Next = third
 	current := head
 	result := CountNodes(head)
 
