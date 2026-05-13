@@ -2686,3 +2686,430 @@ kubectl get sa -n slack-integration-dev
 ```
 
 Most failures like `CreateContainerConfigError` are usually caused by missing secrets, wrong secret keys, missing config maps, bad environment variables, or service account configuration issues.
+
+---
+Yes. These files are **directly related** to this debug chain:
+
+```text
+Trigger
+  ↓
+PipelineRun
+  ↓
+TaskRun
+  ↓
+Pod
+  ↓
+Step container logs
+```
+
+For your project, the relation is probably like this:
+
+```text
+Webhook / PR event
+  ↓
+pr-listener.yaml
+  ↓
+pr-binding.yaml
+  ↓
+pr-trigger-template.yaml
+  ↓
+pr-pipeline.yaml
+  ↓
+PipelineRun
+  ↓
+TaskRun
+  ↓
+Pod
+  ↓
+Step logs
+```
+
+---
+
+## What each file does
+
+### 1. `pr-listener.yaml`
+
+This is usually the **EventListener**.
+
+It receives the incoming event.
+
+For example:
+
+```text
+GitHub PR opened
+GitHub PR updated
+curl webhook request
+```
+
+Think of it as the front door.
+
+```text
+External event comes here first.
+```
+
+Debug when:
+
+```text
+No PipelineRun is created at all.
+```
+
+Useful commands:
+
+```bash
+kubectl get eventlisteners -n $NS
+kubectl describe eventlistener <listener-name> -n $NS
+kubectl get pods -n $NS
+kubectl logs <eventlistener-pod> -n $NS
+kubectl get svc -n $NS
+```
+
+If this file is wrong, your pipeline may never start.
+
+---
+
+### 2. `pr-binding.yaml`
+
+This is usually the **TriggerBinding**.
+
+It extracts values from the incoming event.
+
+Example:
+
+```text
+repo URL
+branch name
+commit SHA
+PR number
+author
+repository name
+```
+
+Think of it like reading JSON data from the webhook.
+
+Example idea:
+
+```text
+From webhook body:
+  body.repository.clone_url
+  body.pull_request.head.ref
+  body.pull_request.number
+```
+
+Then it passes those values as Tekton params.
+
+Debug when:
+
+```text
+PipelineRun is created, but params are empty or wrong.
+```
+
+Example problem:
+
+```text
+Expected branch: feature/login
+Got branch: empty
+```
+
+Useful commands:
+
+```bash
+kubectl get triggerbindings -n $NS
+kubectl describe triggerbinding <binding-name> -n $NS
+kubectl get triggerbinding <binding-name> -n $NS -o yaml
+```
+
+If this file is wrong, the pipeline starts with bad input.
+
+---
+
+### 3. `pr-trigger-template.yaml`
+
+This is usually the **TriggerTemplate**.
+
+It defines what should be created after the trigger receives an event.
+
+Most commonly, it creates a `PipelineRun`.
+
+Think of it as:
+
+```text
+When an event arrives, create this PipelineRun using these params.
+```
+
+This file connects trigger data to the actual Tekton run.
+
+Debug when:
+
+```text
+EventListener receives event, but PipelineRun is not created.
+```
+
+Or:
+
+```text
+PipelineRun is created but has wrong params, wrong pipelineRef, wrong serviceAccount, or wrong workspace.
+```
+
+Useful commands:
+
+```bash
+kubectl get triggertemplates -n $NS
+kubectl describe triggertemplate <template-name> -n $NS
+kubectl get triggertemplate <template-name> -n $NS -o yaml
+```
+
+Common mistakes here:
+
+```text
+wrong pipelineRef
+missing param
+wrong workspace name
+wrong serviceAccountName
+wrong secret name
+```
+
+---
+
+### 4. `pr-pipeline.yaml`
+
+This is the actual **Pipeline**.
+
+It defines the CI/CD steps.
+
+Example:
+
+```text
+clone repo
+  ↓
+run Go tests
+  ↓
+build image
+  ↓
+send Slack notification
+```
+
+Think of it as the recipe.
+
+The `TriggerTemplate` creates a `PipelineRun`, and that `PipelineRun` usually references this pipeline.
+
+Debug when:
+
+```text
+PipelineRun exists but TaskRun fails.
+```
+
+Useful commands:
+
+```bash
+kubectl get pipelines -n $NS
+kubectl describe pipeline <pipeline-name> -n $NS
+kubectl get pipeline <pipeline-name> -n $NS -o yaml
+```
+
+Common mistakes here:
+
+```text
+wrong taskRef
+missing task param
+workspace name mismatch
+task order wrong
+Slack notification task missing secret
+Go test task has wrong working directory
+```
+
+---
+
+## Simple mental model
+
+Use this:
+
+```text
+pr-listener.yaml
+  = receives the event
+
+pr-binding.yaml
+  = extracts values from the event
+
+pr-trigger-template.yaml
+  = creates the PipelineRun
+
+pr-pipeline.yaml
+  = defines what the PipelineRun will execute
+```
+
+So yes, they are related like this:
+
+```text
+Trigger layer:
+  pr-listener.yaml
+  pr-binding.yaml
+  pr-trigger-template.yaml
+
+PipelineRun / TaskRun layer:
+  pr-pipeline.yaml
+```
+
+---
+
+## Debug order using your files
+
+### Case 1: No `PipelineRun` is created
+
+Check these first:
+
+```text
+1. pr-listener.yaml
+2. pr-binding.yaml
+3. pr-trigger-template.yaml
+```
+
+Commands:
+
+```bash
+kubectl get eventlisteners -n $NS
+kubectl describe eventlistener <name> -n $NS
+
+kubectl get triggerbindings -n $NS
+kubectl describe triggerbinding <name> -n $NS
+
+kubectl get triggertemplates -n $NS
+kubectl describe triggertemplate <name> -n $NS
+```
+
+Meaning:
+
+```text
+The problem is probably in the trigger setup.
+```
+
+---
+
+### Case 2: `PipelineRun` is created but fails immediately
+
+Check:
+
+```text
+1. pr-trigger-template.yaml
+2. pr-pipeline.yaml
+```
+
+Commands:
+
+```bash
+kubectl get pipelineruns -n $NS
+kubectl describe pipelinerun <pipelinerun-name> -n $NS
+```
+
+Possible error:
+
+```text
+Pipeline not found
+missing required param
+workspace not bound
+serviceAccount not found
+```
+
+Meaning:
+
+```text
+The trigger worked, but the PipelineRun definition has a configuration problem.
+```
+
+---
+
+### Case 3: `PipelineRun` starts but one task fails
+
+Check:
+
+```text
+1. pr-pipeline.yaml
+2. related Task YAML
+3. TaskRun
+4. Pod logs
+```
+
+Commands:
+
+```bash
+kubectl get taskruns -n $NS
+kubectl describe taskrun <taskrun-name> -n $NS
+kubectl get pods -n $NS
+kubectl logs <pod-name> --all-containers=true -n $NS
+```
+
+Meaning:
+
+```text
+The trigger worked.
+The PipelineRun worked.
+Now the failure is inside a task, pod, or step.
+```
+
+---
+
+## Best beginner debugging map
+
+```text
+No PipelineRun?
+  → Check pr-listener.yaml
+  → Check pr-binding.yaml
+  → Check pr-trigger-template.yaml
+
+PipelineRun exists but bad params?
+  → Check pr-binding.yaml
+  → Check pr-trigger-template.yaml
+
+PipelineRun exists but cannot start?
+  → Check pr-trigger-template.yaml
+  → Check pr-pipeline.yaml
+
+TaskRun failed?
+  → Check pr-pipeline.yaml
+  → Check Task YAML
+  → Check Pod
+  → Check step logs
+
+Slack message failed?
+  → Check secret
+  → Check service account
+  → Check send-slack task logs
+```
+
+---
+
+## One very important point
+
+If you manually run a `PipelineRun` using:
+
+```bash
+kubectl apply -f pipelinerun.yaml -n $NS
+```
+
+then these files may not be used:
+
+```text
+pr-listener.yaml
+pr-binding.yaml
+pr-trigger-template.yaml
+```
+
+Because manual runs skip the trigger system.
+
+But this file is still used:
+
+```text
+pr-pipeline.yaml
+```
+
+So:
+
+```text
+Webhook-based run:
+  listener → binding → template → pipeline
+
+Manual run:
+  PipelineRun → pipeline
+```
+
+That difference is very important while debugging.
